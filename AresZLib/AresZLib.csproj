@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\AresF\AresFLib\AresFLib.csproj" />
+		<ProjectReference Include="..\..\AresI\AresILib\AresILib.csproj" />
+		<ProjectReference Include="..\..\AresT\AresTLib\AresTLib.csproj" />
+		<ProjectReference Include="..\..\AresV\AresVLib\AresVLib.csproj" />
+		<ProjectReference Include="..\AresZDecoding\AresZDecoding.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,24 +1,25 @@
 ﻿global using AresFLib;
 global using AresILib;
 global using AresTLib;
-global using AresGlobalMethods;
-global using Corlib.NStar;
-global using Mpir.NET;
+global using NStar.Core;
+global using NStar.MathLib.Extras;
 global using System;
 global using System.Diagnostics;
 global using System.IO;
 global using System.Text;
 global using System.Threading;
-global using System.Threading.Tasks;
 global using UnsafeFunctions;
 global using G = System.Collections.Generic;
 global using static AresFLib.Global;
 global using static AresGlobalMethods.DecodingExtents;
 global using static AresGlobalMethods.Global;
-global using static Corlib.NStar.Extents;
+global using static NStar.Core.Extents;
 global using static System.Math;
 global using static UnsafeFunctions.Global;
-global using String = Corlib.NStar.String;
+global using String = NStar.Core.String;
+using NStar.Dictionaries;
+using NStar.Linq;
+using NStar.MathLib;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
@@ -182,7 +183,7 @@ public static class MainClassZ
 	{
 		try
 		{
-			Supertotal = 0;
+			Fragments = 0;
 			isWorking = true;
 			if (action == Archive)
 			{
@@ -232,15 +233,17 @@ public static class MainClassZ
 			NList<byte> list =
 			[
 				0,
-				.. BitConverter.GetBytes(Supertotal),
-				.. BitConverter.GetBytes(SupertotalMaximum),
-				.. BitConverter.GetBytes(Total),
-				.. BitConverter.GetBytes(TotalMaximum),
+				.. BitConverter.GetBytes(Files),
+				.. BitConverter.GetBytes(FilesMaximum),
+				.. BitConverter.GetBytes(Fragments),
+				.. BitConverter.GetBytes(FragmentsMaximum),
+				.. BitConverter.GetBytes(Branches),
+				.. BitConverter.GetBytes(BranchesMaximum),
 			];
 			for (var i = 0; i < ProgressBarGroups; i++)
 			{
-				list.AddRange(BitConverter.GetBytes(Subtotal[i]));
-				list.AddRange(BitConverter.GetBytes(SubtotalMaximum[i]));
+				list.AddRange(BitConverter.GetBytes(Methods[i]));
+				list.AddRange(BitConverter.GetBytes(MethodsMaximum[i]));
 				list.AddRange(BitConverter.GetBytes(Current[i]));
 				list.AddRange(BitConverter.GetBytes(CurrentMaximum[i]));
 				list.AddRange(BitConverter.GetBytes(Status[i]));
@@ -268,6 +271,8 @@ public static class MainClassZ
 		var tempFilename = "";
 		try
 		{
+			Files = 0;
+			FilesMaximum = (PresentMethodsZ.HasFlag(UsedMethodsZ.CompressThenArchive) ? 4 : 1) * filename.Length * ProgressBarStep;
 			tempFilename = (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + "/Ares-" + Environment.ProcessId + ".tmp";
 			if (PresentMethodsZ.HasFlag(UsedMethodsZ.CompressThenArchive))
 			{
@@ -316,6 +321,7 @@ public static class MainClassZ
 			var x = filename[i];
 			if (File.Exists(x))
 				ArchiveExistent(wfs, filename, i, addHeader);
+			Files += ProgressBarStep;
 		}
 	}
 
@@ -378,7 +384,7 @@ public static class MainClassZ
 	{
 		NList<byte> header = [];
 		PreArchive(header, filename);
-		var encoded = new ExecutionsF(header).Encode();
+		var encoded = new FragmentEncF(header).Encode();
 		var wfs = File.Open(headerTempFile, FileMode.OpenOrCreate);
 		if (encoded.Length < header.Length)
 		{
@@ -408,6 +414,7 @@ public static class MainClassZ
 			var wfs = File.Open(dic['F'], FileMode.OpenOrCreate);
 			wfs.WriteByte(64);
 			MainClassF.Compress(rfs, wfs);
+			Files += ProgressBarStep;
 			wfs.Close();
 			try
 			{
@@ -416,6 +423,7 @@ public static class MainClassZ
 			catch
 			{
 			}
+			Files += ProgressBarStep;
 			rfs.Seek(0, SeekOrigin.Begin);
 			wfs = File.Open(dic['T'], FileMode.OpenOrCreate);
 			wfs.WriteByte(65);
@@ -426,6 +434,7 @@ public static class MainClassZ
 			catch
 			{
 			}
+			Files += ProgressBarStep;
 			wfs.Close();
 			return dic.Values.FindMin(y => File.Exists(y) && CreateVar(new FileInfo(y).Length, out var len) > GetArrayLength(rfs.Length, FragmentLength) * 2 + 1 ? len : long.MaxValue) ?? throw new InvalidOperationException();
 		}
@@ -446,8 +455,8 @@ public static class MainClassZ
 		using NList<byte> bytes = [];
 		if (continue_ && fragmentCount != 0)
 		{
-			Supertotal = 0;
-			SupertotalMaximum = fragmentCount * 10;
+			Fragments = 0;
+			FragmentsMaximum = fragmentCount * ProgressBarStep;
 			var fragmentCount2 = fragmentCount;
 			BitList bits = default!;
 			int i;
@@ -496,7 +505,7 @@ public static class MainClassZ
 					unchecked((byte)(s.Length >> BitsPerByte)), unchecked((byte)s.Length)]);
 			}
 			wfs.Write(s.AsSpan());
-			Supertotal += ProgressBarStep;
+			Fragments += ProgressBarStep;
 			GC.Collect();
 		}
 	}
@@ -548,7 +557,9 @@ public static class MainClassZ
 		if (rfs.Length - rfs.Position < compressedHeader.Length)
 			throw new DecoderFallbackException();
 		rfs.ReadExactly(compressedHeader.AsSpan());
-		var header = headerVersion == 0 ? compressedHeader : new DecodingF().Decode(compressedHeader, headerVersion);
+		var dec = new DecodingF();
+		var header = headerVersion == 0 ? compressedHeader : dec.Decode(compressedHeader, headerVersion);
+		dec.Dispose();
 		List<(string Name, FileInfo2 Info)> files = [];
 		PreUnarchive(header, files);
 		if (Directory.Exists(filename))
@@ -655,7 +666,7 @@ public static class MainClassZ
 		{
 			fragmentCount = 0;
 			DecodeFibonacci(rfs, readByte);
-			SupertotalMaximum = fragmentCount * 10;
+			FragmentsMaximum = fragmentCount * ProgressBarStep;
 		}
 		using NList<byte> bytes = [], sizeBytes = RedStarLinq.NEmptyList<byte>(4);
 		for (; fragmentCount > 0; fragmentCount--)
@@ -679,7 +690,7 @@ public static class MainClassZ
 			}
 			var s = bytes;
 			wfs.Write(s.AsSpan());
-			Supertotal += ProgressBarStep;
+			Fragments += ProgressBarStep;
 			GC.Collect();
 		}
 		FragmentLength = PreservedFragmentLength;
@@ -714,7 +725,7 @@ public static class MainClassZ
 		{
 			fragmentCount = 0;
 			DecodeFibonacci(rfs, readByte);
-			SupertotalMaximum = fragmentCount * 10;
+			FragmentsMaximum = fragmentCount * ProgressBarStep;
 		}
 		using NList<byte> bytes = [], sizeBytes = RedStarLinq.NEmptyList<byte>(4);
 		for (; fragmentCount > 0; fragmentCount--)
@@ -736,11 +747,13 @@ public static class MainClassZ
 				bytes.Resize(fragmentLength);
 				rfs.ReadExactly(bytes.AsSpan());
 			}
-			var s = new ExecutionsF(new DecodingF().Decode(bytes, encodingVersion)).Encode();
+			var dec = new DecodingF();
+			var s = new FragmentEncF(dec.Decode(bytes, encodingVersion)).Encode();
+			dec.Dispose();
 			if (fragmentCount != 1)
 				wfs.Write([(byte)(s.Length >> (BitsPerByte << 1)), unchecked((byte)(s.Length >> BitsPerByte)), unchecked((byte)s.Length)]);
 			wfs.Write(s.AsSpan());
-			Supertotal += ProgressBarStep;
+			Fragments += ProgressBarStep;
 			GC.Collect();
 		}
 		if (wfs.Position > rfs.Length)
